@@ -27,7 +27,7 @@ alter table public.student_profiles
     check (meet_genders <@ array['women', 'men', 'self_described_prefer_not']::text[]),
   drop constraint if exists student_profiles_connection_interests_check,
   add constraint student_profiles_connection_interests_check
-    check (connection_interests <@ array['garba_partner', 'friendship', 'romantic']::text[]);
+    check (connection_interests <@ array['garba_partner', 'friends']::text[]);
 
 create table if not exists public.student_swipes (
   actor_id text not null references public.student_profiles(user_id) on delete cascade,
@@ -235,7 +235,7 @@ begin
     raise exception 'invalid_meet_genders' using errcode = '22023';
   end if;
   if coalesce(cardinality(p_connection_interests), 0) = 0
-    or not (p_connection_interests <@ array['garba_partner', 'friendship', 'romantic']::text[])
+    or not (p_connection_interests <@ array['garba_partner', 'friends']::text[])
     or cardinality(p_connection_interests) <> (
       select count(distinct value) from unnest(p_connection_interests) as selected(value)
     ) then

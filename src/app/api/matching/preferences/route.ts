@@ -11,7 +11,7 @@ const genderIdentities = new Set([
   "prefer_not_to_say",
 ]);
 const meetOptions = new Set(["women", "men", "self_described_prefer_not"]);
-const connectionOptions = new Set(["garba_partner", "friendship", "romantic"]);
+const connectionOptions = new Set(["garba_partner", "friends"]);
 
 function response(body: unknown, status = 200) {
   return Response.json(body, {

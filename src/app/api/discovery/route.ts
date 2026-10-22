@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import type { NextRequest } from "next/server";
 import { hasSameOrigin } from "@/lib/api-security";
+import { getOnboardingStatus } from "@/lib/onboarding-status";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 const photoBucket = "profile-photos";
@@ -35,19 +36,13 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   if (!supabase) return response({ error: "Matching storage is not configured yet." }, 503);
 
-  const { data: ownProfile, error: profileError } = await supabase
-    .from("student_profiles")
-    .select("gender_identity, meet_genders, connection_interests")
-    .eq("user_id", userId)
-    .maybeSingle();
+  const { result: onboarding, error: profileError } = await getOnboardingStatus(supabase, userId);
   if (profileError) {
     console.error("Unable to check discovery setup:", profileError.message);
     return response({ error: "Couldn't load your discovery setup. Please try again." }, 500);
   }
-  if (!ownProfile) return response({ candidate: null, needsProfile: true });
-  if (!ownProfile.gender_identity || !ownProfile.meet_genders.length || !ownProfile.connection_interests.length) {
-    return response({ candidate: null, needsPreferences: true });
-  }
+  if (onboarding?.status === "profile_missing") return response({ candidate: null, needsProfile: true });
+  if (onboarding?.status === "preferences_missing") return response({ candidate: null, needsPreferences: true });
 
   const { data, error } = await supabase.rpc("get_discovery_candidates", { p_actor_id: userId });
   if (error) {
@@ -81,6 +76,15 @@ export async function POST(request: NextRequest) {
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return response({ error: "Matching storage is not configured yet." }, 503);
+
+  const { result: onboarding, error: statusError } = await getOnboardingStatus(supabase, userId);
+  if (statusError) {
+    console.error("Unable to verify swipe access:", statusError.message);
+    return response({ error: "Couldn't verify your setup. Please retry." }, 503);
+  }
+  if (onboarding?.status !== "complete") {
+    return response({ error: "Finish your student profile and matching preferences first." }, 409);
+  }
 
   let parsedBody: unknown;
   try {
