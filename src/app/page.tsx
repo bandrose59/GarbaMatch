@@ -136,7 +136,26 @@ export default function Home() {
 
   if (!isLoaded || (isSignedIn && (!userId || verifiedUserId !== userId
     || onboardingState === "loading" || onboardingState === "redirecting"))) {
-    return <main className="app"><div className="empty-state" role="status"><p>Checking your account setup…</p></div></main>;
+    return (
+      <main className="app">
+        <header className="topbar">
+          <Link className="brand" href="/" aria-label="GarbaMatch home">
+            <span className="brand-mark">g<span>✳</span></span>
+            <span>garba<span className="brand-light">match</span></span>
+          </Link>
+          <div className="topbar-right">
+            <span className="campus-pill"><span className="live-dot" /> SGGSIE&T · Nanded</span>
+            {!isLoaded || !isSignedIn ? (
+              <>
+                <Link className="auth-link" href="/sign-in">Sign in</Link>
+                <Link className="auth-join" href="/sign-up">Join free <span>↗</span></Link>
+              </>
+            ) : <UserButton />}
+          </div>
+        </header>
+        <div className="empty-state" role="status"><p>Checking your account setup…</p></div>
+      </main>
+    );
   }
 
   if (isSignedIn && onboardingState === "error") {
@@ -165,15 +184,12 @@ export default function Home() {
         </button>
         <div className="topbar-right">
           <span className="campus-pill"><span className="live-dot" /> SGGSIE&T · Nanded</span>
-          <Suspense fallback={<Link className="auth-link" href="/sign-in">Sign in</Link>}>
-            <Show when="signed-out">
+          {isSignedIn ? <UserButton /> : (
+            <>
               <Link className="auth-link" href="/sign-in">Sign in</Link>
               <Link className="auth-join" href="/sign-up">Join free <span>↗</span></Link>
-            </Show>
-            <Show when="signed-in">
-              <UserButton />
-            </Show>
-          </Suspense>
+            </>
+          )}
         </div>
       </header>
 
