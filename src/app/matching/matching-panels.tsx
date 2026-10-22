@@ -13,7 +13,6 @@ type Candidate = {
 
 type Match = Candidate & {
   connectionInterests: string[];
-  instagramUsername: string | null;
   matchedAt: string;
 };
 
@@ -42,21 +41,12 @@ const meetOptions = [
 
 const connectionOptions = [
   { value: "garba_partner", label: "Garba partner" },
-  { value: "friends", label: "Friends" },
+  { value: "friendship", label: "Friendship" },
+  { value: "romantic", label: "Romantic connection" },
 ];
 
 async function readResponse<T>(response: Response): Promise<T & ApiError> {
   return await response.json() as T & ApiError;
-}
-
-function InstagramIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="3" width="18" height="18" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.5" cy="6.5" r=".9" fill="currentColor" stroke="none" />
-    </svg>
-  );
 }
 
 function ToggleGroup({
@@ -98,11 +88,9 @@ function ToggleGroup({
 }
 
 export function MatchingPreferencesPanel({
-  mandatory = false,
   onCancel,
   onSaved,
 }: {
-  mandatory?: boolean;
   onCancel: () => void;
   onSaved: () => void;
 }) {
@@ -113,8 +101,6 @@ export function MatchingPreferencesPanel({
     connectionInterests: [],
   });
   const [loading, setLoading] = useState(true);
-  const [preferencesLoadFailed, setPreferencesLoadFailed] = useState(false);
-  const [preferencesLoadRetry, setPreferencesLoadRetry] = useState(0);
   const [saving, setSaving] = useState(false);
   const [needsProfile, setNeedsProfile] = useState(false);
   const [error, setError] = useState("");
@@ -125,23 +111,17 @@ export function MatchingPreferencesPanel({
       .then(readResponse<{ preferences: Preferences | null }>)
       .then((result) => {
         if (!active) return;
-        if (result.error) {
-          setPreferencesLoadFailed(true);
-          setError(result.error);
-        }
+        if (result.error) setError(result.error);
         else if (result.preferences) setPreferences(result.preferences);
       })
       .catch(() => {
-        if (active) {
-          setPreferencesLoadFailed(true);
-          setError("Couldn't load your preferences. Check your connection and retry.");
-        }
+        if (active) setError("Couldn't load your preferences. Check your connection and retry.");
       })
       .finally(() => {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [preferencesLoadRetry]);
+  }, []);
 
   function toggle(field: "meetGenders" | "connectionInterests", value: string) {
     setPreferences((current) => ({
@@ -179,29 +159,15 @@ export function MatchingPreferencesPanel({
   return (
     <section className="page-section content-page matching-preferences">
       <div className="page-heading">
-        {mandatory
-          ? <span className="back-link">STEP 2 OF 2 · REQUIRED</span>
-          : <button className="back-link" type="button" onClick={onCancel}>← Back</button>}
+        <button className="back-link" type="button" onClick={onCancel}>← Back</button>
         <span className="step-count">PRIVATE <i>· YOUR CHOICE</i></span>
       </div>
       <div className="eyebrow"><span className="eyebrow-line" /> YOUR DISCOVERY PREFERENCES</div>
       <h1>Meet your <em>kind of people.</em></h1>
-      <p className="section-lede">{mandatory
-        ? "Choose your matching preferences to finish setup. These answers stay private and are used only to find mutually compatible people."
-        : "These answers stay private and are used only to find mutually compatible people."}</p>
+      <p className="section-lede">These answers stay private and are used only to find mutually compatible people.</p>
 
       {loading ? (
         <div className="empty-state" role="status"><p>Loading your preferences…</p></div>
-      ) : preferencesLoadFailed ? (
-        <div className="matching-error" role="alert">
-          <span>{error}</span>
-          <button type="button" onClick={() => {
-            setLoading(true);
-            setPreferencesLoadFailed(false);
-            setError("");
-            setPreferencesLoadRetry((value) => value + 1);
-          }}>Retry</button>
-        </div>
       ) : (
         <form className="matching-form" onSubmit={savePreferences}>
           {error && <p className="matching-error" role="alert">{error}</p>}
@@ -258,9 +224,9 @@ export function MatchingPreferencesPanel({
             onToggle={(value) => toggle("connectionInterests", value)}
           />
           <div className="matching-actions">
-            {!mandatory && <button className="button button-outline" type="button" onClick={onCancel}>Cancel</button>}
+            <button className="button button-outline" type="button" onClick={onCancel}>Cancel</button>
             <button className="button button-primary" disabled={saving || !preferences.genderIdentity || !preferences.meetGenders.length || !preferences.connectionInterests.length}>
-              {saving ? "Saving…" : mandatory ? "Finish setup" : "Save preferences"} <span>→</span>
+              {saving ? "Saving…" : "Save preferences"} <span>→</span>
             </button>
           </div>
         </form>
@@ -467,9 +433,6 @@ export function MatchesPanel({ onDiscover }: { onDiscover: () => void }) {
                     <span key={interest}>{connectionOptions.find((option) => option.value === interest)?.label ?? interest}</span>
                   ))}
                 </div>
-                {match.instagramUsername && /^[A-Za-z0-9._]{1,30}$/.test(match.instagramUsername)
-                  ? <a className="match-instagram" href={`https://www.instagram.com/${encodeURIComponent(match.instagramUsername)}/`} target="_blank" rel="noopener noreferrer"><InstagramIcon /> @{match.instagramUsername} <span aria-hidden="true">↗</span></a>
-                  : <p className="match-instagram-missing"><InstagramIcon /> Instagram not added.</p>}
                 <small>Matched {new Date(match.matchedAt).toLocaleDateString("en-US", { timeZone: "UTC" })}</small>
               </div>
             </article>

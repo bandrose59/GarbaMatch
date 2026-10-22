@@ -28,8 +28,6 @@ export default function ProfileSetupForm() {
   });
   const [newPhotos, setNewPhotos] = useState<NewPhoto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
-  const [profileLoadRetry, setProfileLoadRetry] = useState(0);
   const [saving, setSaving] = useState(false);
   const [profileReady, setProfileReady] = useState(false);
   const [error, setError] = useState("");
@@ -50,10 +48,7 @@ export default function ProfileSetupForm() {
         }
       })
       .catch((loadError: unknown) => {
-        if (active) {
-          setProfileLoadFailed(true);
-          setError(loadError instanceof Error ? loadError.message : "Couldn't load your profile.");
-        }
+        if (active) setError(loadError instanceof Error ? loadError.message : "Couldn't load your profile.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -63,7 +58,7 @@ export default function ProfileSetupForm() {
       urls.forEach((url) => URL.revokeObjectURL(url));
       urls.clear();
     };
-  }, [profileLoadRetry]);
+  }, []);
 
   const availableSlots = 2 - profile.photos.length - newPhotos.length;
 
@@ -137,14 +132,7 @@ export default function ProfileSetupForm() {
   const instagramUrl = /^[A-Za-z0-9._]{1,30}$/.test(instagramUsername)
     ? `https://www.instagram.com/${encodeURIComponent(instagramUsername)}/`
     : null;
-  const continueToPreferences = () => {
-    const requested = new URLSearchParams(window.location.search).get("next");
-    const next = requested === "matches" || requested === "profile" ? requested : "discover";
-    router.push(`/?onboarding=preferences&next=${encodeURIComponent(next)}`);
-  };
-  const requiredProfileComplete = Boolean(
-    profile.displayName.trim() && profile.branch.trim() && profile.academicYear.trim(),
-  );
+  const continueToPreferences = () => router.push("/?onboarding=preferences");
 
   return (
     <main className="auth-screen profile-setup-screen">
@@ -160,17 +148,7 @@ export default function ProfileSetupForm() {
         <h1>Introduce<br /><em>yourself.</em></h1>
         <p className="auth-description">You’re signed in. Add a few details for your campus profile; photos and Instagram are optional.</p>
 
-        {loading ? <p className="form-status" role="status">Loading your profile…</p> : profileLoadFailed ? (
-          <div className="form-error" role="alert">
-            <p>{error}</p>
-            <button type="button" className="button button-outline" onClick={() => {
-              setLoading(true);
-              setProfileLoadFailed(false);
-              setError("");
-              setProfileLoadRetry((value) => value + 1);
-            }}>Retry loading your profile</button>
-          </div>
-        ) : (
+        {loading ? <p className="form-status" role="status">Loading your profile…</p> : (
           <form className="profile-form" onSubmit={saveProfile}>
             <label>
               Display name
@@ -225,7 +203,7 @@ export default function ProfileSetupForm() {
                 {saving ? "Saving…" : "Save profile"} <span>→</span>
               </button>
               {profileReady && (
-                <button className="continue-profile-button" type="button" disabled={!requiredProfileComplete} onClick={continueToPreferences}>
+                <button className="continue-profile-button" type="button" onClick={continueToPreferences}>
                   Continue to Garba preferences <span>→</span>
                 </button>
               )}

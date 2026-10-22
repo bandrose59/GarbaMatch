@@ -162,9 +162,6 @@ h1 em, h2 em { color: var(--pink); font-weight: 500; }
 .match-card-info h2 { margin: 8px 0 4px; font-family: var(--serif); font-size: 22px; font-weight: 500; }
 .match-card-info p { margin: 0; color: var(--muted); font-size: 10px; }
 .match-card-info small { display: block; margin-top: 11px; color: #a4949a; font-size: 9px; }
-.match-instagram, .match-instagram-missing { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--plum); font-size: 10px; font-weight: 600; text-decoration: none; }
-.match-instagram:hover { color: var(--pink); text-decoration: underline; }
-.match-instagram-missing { color: var(--muted); font-weight: 400; }
 .matches-empty { margin-top: 75px; }
 .button-outline { border: 1px solid var(--line); background: transparent; color: var(--plum); }
 .event-card { display: grid; grid-template-columns: 1fr 1fr; margin-top: 40px; background: var(--paper); border: 1px solid var(--line); }

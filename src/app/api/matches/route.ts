@@ -1,5 +1,4 @@
 import { auth } from "@clerk/nextjs/server";
-import { getOnboardingStatus } from "@/lib/onboarding-status";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 const photoBucket = "profile-photos";
@@ -10,7 +9,6 @@ type MatchRow = {
   branch: string;
   academic_year: string;
   photo_paths: string[] | null;
-  instagram_username: string | null;
   connection_interests: string[];
   matched_at: string;
 };
@@ -28,15 +26,6 @@ export async function GET() {
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return response({ error: "Matching storage is not configured yet." }, 503);
-
-  const { result: onboarding, error: statusError } = await getOnboardingStatus(supabase, userId);
-  if (statusError) {
-    console.error("Unable to verify match access:", statusError.message);
-    return response({ error: "Couldn't verify your setup. Please retry." }, 503);
-  }
-  if (onboarding?.status !== "complete") {
-    return response({ error: "Finish your student profile and matching preferences first." }, 409);
-  }
 
   const { data, error } = await supabase.rpc("get_student_matches", { p_actor_id: userId });
   if (error) {
@@ -66,10 +55,6 @@ export async function GET() {
       branch: match.branch,
       academicYear: match.academic_year,
       photos,
-      instagramUsername: typeof match.instagram_username === "string"
-        && /^[A-Za-z0-9._]{1,30}$/.test(match.instagram_username)
-        ? match.instagram_username
-        : null,
       connectionInterests: match.connection_interests,
       matchedAt: match.matched_at,
     };

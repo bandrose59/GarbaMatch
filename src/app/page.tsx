@@ -7,8 +7,6 @@ import { Suspense, useEffect, useState } from "react";
 import { DiscoveryPanel, MatchingPreferencesPanel, MatchesPanel } from "@/app/matching/matching-panels";
 
 type Screen = "home" | "onboarding" | "discover" | "matches" | "events" | "profile";
-type OnboardingState = "loading" | "complete" | "profile_missing" | "preferences_missing" | "error" | "redirecting";
-const memberDestinations = new Set(["discover", "matches", "profile"]);
 
 const tabs: { id: Screen; label: string; icon: string }[] = [
   { id: "discover", label: "Discover", icon: "✳" },
@@ -18,82 +16,42 @@ const tabs: { id: Screen; label: string; icon: string }[] = [
 ];
 
 export default function Home() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
   const [screen, setScreen] = useState<Screen>("home");
-  const [preferencesReturnScreen, setPreferencesReturnScreen] = useState<"discover" | "matches" | "profile">("discover");
-  const [onboardingState, setOnboardingState] = useState<OnboardingState>("loading");
-  const [onboardingError, setOnboardingError] = useState("");
-  const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null);
-  const [statusRetry, setStatusRetry] = useState(0);
+  const [preferencesReturnScreen, setPreferencesReturnScreen] = useState<"discover" | "profile">("discover");
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (!isSignedIn) {
-      if (new URLSearchParams(window.location.search).get("tab") === "events") {
-        const timeoutId = window.setTimeout(() => setScreen("events"), 0);
-        return () => window.clearTimeout(timeoutId);
+
+    const timeoutId = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedTab = params.get("tab");
+      if (requestedTab === "events") {
+        setScreen("events");
+        return;
       }
-      return;
-    }
-    if (!userId) return;
-    let active = true;
-    void fetch("/api/onboarding/status", { cache: "no-store" })
-      .then(async (response) => {
-        const body = await response.json() as { status?: OnboardingState; error?: string; diagnostic?: string };
-        if (!response.ok || !body.status
-          || !["profile_missing", "preferences_missing", "complete"].includes(body.status)) {
-          const failure = new Error(body.error ?? "Couldn't verify your setup.");
-          Object.assign(failure, { diagnostic: body.diagnostic });
-          throw failure;
-        }
-        if (!active) return;
-
-        const params = new URLSearchParams(window.location.search);
-        const next = params.get("next");
-        const tab = params.get("tab");
-        const destination = memberDestinations.has(next ?? "")
-          ? next as "discover" | "matches" | "profile"
-          : memberDestinations.has(tab ?? "")
-            ? tab as "discover" | "matches" | "profile"
-            : "discover";
-
-        setVerifiedUserId(userId);
-        if (body.status === "profile_missing") {
-          const query = new URLSearchParams({ next: destination });
-          setOnboardingState("redirecting");
-          router.replace(`/onboarding/profile?${query.toString()}`);
+      if (requestedTab === "discover" || requestedTab === "matches" || requestedTab === "profile") {
+        if (!isSignedIn) {
+          router.replace(`/${requestedTab}`);
           return;
         }
-        if (body.status === "preferences_missing") {
-          setOnboardingState("preferences_missing");
-          setPreferencesReturnScreen(destination);
-          setScreen("onboarding");
+        setScreen(requestedTab);
+        return;
+      }
+      if (params.get("onboarding") === "preferences") {
+        if (!isSignedIn) {
+          router.replace("/sign-in");
           return;
         }
+        setScreen("onboarding");
+        return;
+      }
 
-        setOnboardingState("complete");
-        if (params.get("onboarding") === "preferences") {
-          setScreen(destination);
-        } else if (tab === "events") {
-          setScreen("events");
-        } else if (memberDestinations.has(tab ?? "")) {
-          setScreen(tab as "discover" | "matches" | "profile");
-        } else {
-          setScreen("discover");
-        }
-      })
-      .catch((statusError: unknown) => {
-        if (!active) return;
-        console.error("Unable to verify onboarding before showing member pages:", statusError);
-        setOnboardingError(statusError instanceof Error
-          ? statusError.message
-          : "The onboarding verification request failed. Retry to check Supabase and your connection.");
-        setVerifiedUserId(userId);
-        setOnboardingState("error");
-      });
-    return () => { active = false; };
-  }, [isLoaded, isSignedIn, router, statusRetry, userId]);
+      setScreen(isSignedIn ? "discover" : "home");
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [isLoaded, isSignedIn, router]);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -134,47 +92,6 @@ export default function Home() {
     setScreen("onboarding");
   }
 
-  if (!isLoaded || (isSignedIn && (!userId || verifiedUserId !== userId
-    || onboardingState === "loading" || onboardingState === "redirecting"))) {
-    return (
-      <main className="app">
-        <header className="topbar">
-          <Link className="brand" href="/" aria-label="GarbaMatch home">
-            <span className="brand-mark">g<span>✳</span></span>
-            <span>garba<span className="brand-light">match</span></span>
-          </Link>
-          <div className="topbar-right">
-            <span className="campus-pill"><span className="live-dot" /> SGGSIE&T · Nanded</span>
-            {!isLoaded || !isSignedIn ? (
-              <>
-                <Link className="auth-link" href="/sign-in">Sign in</Link>
-                <Link className="auth-join" href="/sign-up">Join free <span>↗</span></Link>
-              </>
-            ) : <UserButton />}
-          </div>
-        </header>
-        <div className="empty-state" role="status"><p>Checking your account setup…</p></div>
-      </main>
-    );
-  }
-
-  if (isSignedIn && onboardingState === "error") {
-    return (
-      <main className="app">
-        <div className="empty-state">
-          <h2>We couldn’t verify your setup.</h2>
-          <p>{onboardingError || "Your account data wasn’t changed. Retry to check your connection and Supabase configuration."}</p>
-          <button className="button button-primary" type="button" onClick={() => {
-            setOnboardingState("loading");
-            setVerifiedUserId(null);
-            setOnboardingError("");
-            setStatusRetry((value) => value + 1);
-          }}>Retry <span>→</span></button>
-        </div>
-      </main>
-    );
-  }
-
   return (
     <main className="app">
       <header className="topbar">
@@ -184,12 +101,15 @@ export default function Home() {
         </button>
         <div className="topbar-right">
           <span className="campus-pill"><span className="live-dot" /> SGGSIE&T · Nanded</span>
-          {isSignedIn ? <UserButton /> : (
-            <>
+          <Suspense fallback={<Link className="auth-link" href="/sign-in">Sign in</Link>}>
+            <Show when="signed-out">
               <Link className="auth-link" href="/sign-in">Sign in</Link>
               <Link className="auth-join" href="/sign-up">Join free <span>↗</span></Link>
-            </>
-          )}
+            </Show>
+            <Show when="signed-in">
+              <UserButton />
+            </Show>
+          </Suspense>
         </div>
       </header>
 
@@ -205,7 +125,7 @@ export default function Home() {
                 <Link className="button button-primary" href="/sign-up">Create your account <span>↗</span></Link>
                 </Show>
                 <Show when="signed-in">
-                  <Link className="button button-primary" href="/onboarding/profile?edit=1">Edit your profile <span>↗</span></Link>
+                  <Link className="button button-primary" href="/onboarding/profile">Complete your profile <span>↗</span></Link>
                 </Show>
               </Suspense>
               <Link className="text-button" href="/events">View campus event details <span>→</span></Link>
@@ -224,13 +144,8 @@ export default function Home() {
 
       {isLoaded && isSignedIn && screen === "onboarding" && (
         <MatchingPreferencesPanel
-          mandatory={onboardingState === "preferences_missing"}
           onCancel={() => setScreen(preferencesReturnScreen)}
-          onSaved={() => {
-            setOnboardingState("complete");
-            setVerifiedUserId(userId ?? null);
-            setScreen(preferencesReturnScreen);
-          }}
+          onSaved={() => setScreen(preferencesReturnScreen)}
         />
       )}
 
@@ -319,7 +234,7 @@ export default function Home() {
           <div className="profile-settings">
             <div className="settings-avatar">G<span>✳</span></div><div><span className="aside-kicker">YOUR PROFILE</span><h2>Manage your student details.</h2><p>Update your profile and private matching preferences.</p></div>
             <div className="settings-row"><span>Discovery access</span><span>Available to registered students</span></div>
-            <div className="settings-row"><span>Student profile</span><Link href="/onboarding/profile?edit=1">Edit photos and details →</Link></div>
+            <div className="settings-row"><span>Student profile</span><Link href="/onboarding/profile">Add photos and details →</Link></div>
             <div className="settings-row"><span>Discovery preferences</span><button onClick={() => openPreferences("profile")}>Edit your preferences →</button></div>
             <div className="settings-row"><span>Privacy & account</span><span>Managed by Clerk</span></div>
             <Show when="signed-in">
