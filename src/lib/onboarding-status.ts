@@ -16,17 +16,34 @@ export type OnboardingStatus =
   | { status: "preferences_missing" }
   | { status: "complete" };
 
+export type OnboardingQueryError = {
+  code: string;
+  message: string;
+};
+
 export async function getOnboardingStatus(
   supabase: SupabaseClient,
   userId: string,
-): Promise<{ result: OnboardingStatus | null; error: Error | null }> {
-  const { data, error } = await supabase
-    .from("student_profiles")
-    .select("display_name, branch, academic_year, gender_identity, gender_self_description, meet_genders, connection_interests, onboarding_completed_at")
-    .eq("user_id", userId)
-    .maybeSingle();
+): Promise<{ result: OnboardingStatus | null; error: OnboardingQueryError | null }> {
+  let queryResult;
+  try {
+    queryResult = await supabase
+      .from("student_profiles")
+      .select("display_name, branch, academic_year, gender_identity, gender_self_description, meet_genders, connection_interests, onboarding_completed_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+  } catch (error) {
+    return {
+      result: null,
+      error: {
+        code: "NETWORK_ERROR",
+        message: error instanceof Error ? error.message : "Unknown Supabase request failure",
+      },
+    };
+  }
 
-  if (error) return { result: null, error: new Error(error.message) };
+  const { data, error } = queryResult;
+  if (error) return { result: null, error: { code: error.code ?? "UNKNOWN", message: error.message } };
   if (!data
     || !data.display_name?.trim()
     || !data.branch?.trim()

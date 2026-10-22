@@ -23,6 +23,7 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
   const [preferencesReturnScreen, setPreferencesReturnScreen] = useState<"discover" | "matches" | "profile">("discover");
   const [onboardingState, setOnboardingState] = useState<OnboardingState>("loading");
+  const [onboardingError, setOnboardingError] = useState("");
   const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null);
   const [statusRetry, setStatusRetry] = useState(0);
 
@@ -39,10 +40,12 @@ export default function Home() {
     let active = true;
     void fetch("/api/onboarding/status", { cache: "no-store" })
       .then(async (response) => {
-        const body = await response.json() as { status?: OnboardingState; error?: string };
+        const body = await response.json() as { status?: OnboardingState; error?: string; diagnostic?: string };
         if (!response.ok || !body.status
           || !["profile_missing", "preferences_missing", "complete"].includes(body.status)) {
-          throw new Error(body.error ?? "Couldn't verify your setup.");
+          const failure = new Error(body.error ?? "Couldn't verify your setup.");
+          Object.assign(failure, { diagnostic: body.diagnostic });
+          throw failure;
         }
         if (!active) return;
 
@@ -83,6 +86,9 @@ export default function Home() {
       .catch((statusError: unknown) => {
         if (!active) return;
         console.error("Unable to verify onboarding before showing member pages:", statusError);
+        setOnboardingError(statusError instanceof Error
+          ? statusError.message
+          : "The onboarding verification request failed. Retry to check Supabase and your connection.");
         setVerifiedUserId(userId);
         setOnboardingState("error");
       });
@@ -138,10 +144,11 @@ export default function Home() {
       <main className="app">
         <div className="empty-state">
           <h2>We couldn’t verify your setup.</h2>
-          <p>Your account data wasn’t changed. Check your connection and try again.</p>
+          <p>{onboardingError || "Your account data wasn’t changed. Retry to check your connection and Supabase configuration."}</p>
           <button className="button button-primary" type="button" onClick={() => {
             setOnboardingState("loading");
             setVerifiedUserId(null);
+            setOnboardingError("");
             setStatusRetry((value) => value + 1);
           }}>Retry <span>→</span></button>
         </div>

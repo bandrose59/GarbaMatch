@@ -17,8 +17,29 @@ export async function GET() {
 
   const { result, error } = await getOnboardingStatus(supabase, userId);
   if (error) {
-    console.error("Unable to verify onboarding status:", error.message);
-    return response({ error: "Couldn't verify your setup. Check your connection and retry." }, 503);
+    console.error("Unable to verify onboarding status:", { code: error.code, message: error.message });
+    if (["42703", "42P01", "PGRST204", "PGRST205"].includes(error.code)) {
+      return response({
+        error: "The Supabase onboarding schema is incomplete. Apply the GarbaMatch migrations, then retry.",
+        diagnostic: "SUPABASE_SCHEMA_NOT_READY",
+      }, 503);
+    }
+    if (error.code === "42501") {
+      return response({
+        error: "Supabase denied the onboarding lookup. Check the server-side database key and permissions.",
+        diagnostic: "SUPABASE_PERMISSION_DENIED",
+      }, 503);
+    }
+    if (error.code === "NETWORK_ERROR") {
+      return response({
+        error: "GarbaMatch could not reach Supabase. Check the database URL and network, then retry.",
+        diagnostic: "SUPABASE_UNREACHABLE",
+      }, 503);
+    }
+    return response({
+      error: "Supabase could not verify your saved setup. Check server logs and retry.",
+      diagnostic: `SUPABASE_QUERY_${error.code}`,
+    }, 503);
   }
   return response(result);
 }
